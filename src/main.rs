@@ -1,186 +1,292 @@
+//! # rust_snake
+//!
+//! Terminal implementation of the game "Snake".
+//!
+//! Captures user inputs and uses the active shell to display
+//! a game of "Snake".
+//!
+//! # Controls
+//!
+//! Backspace : Exit the program
+//! Arrow keys : turn
+
 use std::sync::{Arc, Mutex};
 use std::{io, thread};
+use std::thread::JoinHandle;
 use std::time::Duration;
 use console::Key;
 use rand::Rng;
 
-type Map = [[Tile; SCREEN_HEIGHT]; SCREEN_WIDTH];
+/// The width of the [Map] area.
+const MAP_WIDTH: usize = 15;
+/// The Height of the [Map] area.
+const MAP_HEIGHT: usize = 15;
 
-#[derive(Copy, Clone)]
-struct Direction {
-    x: isize,
-    y: isize
-}
+/// Type used to store the position of snake and food tiles.
+type Map = [[Tile; MAP_HEIGHT]; MAP_WIDTH];
 
+const GAME_WIDTH: usize = MAP_WIDTH * 2 + 2;
+
+/// The four directions the [Snake] can face.
 #[derive(Copy, Clone)]
 #[derive(PartialEq)]
+enum Direction {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    NONE
+}
+
+impl Direction {
+    /// The change on the x-axis.
+    fn x(&self) -> isize {
+        match self {
+            Direction::LEFT => -1,
+            Direction::RIGHT => 1,
+            _ => 0
+        }
+    }
+
+    /// The change on the y-axis.
+    fn y(&self) -> isize {
+        match self {
+            Direction::UP => -1,
+            Direction::DOWN => 1,
+            _ => 0
+        }
+    }
+
+    /// Returns if this and the given `Direction` oppose one another.
+    ///
+    /// # Examples
+    /// ```
+    /// assert!(Direction::LEFT.opposite(Direction::RIGHT))
+    /// ```
+    fn opposite(&self, dir: &Direction) -> bool {
+        self.x() + dir.x() == 0 && self.y() + dir.y() == 0
+    }
+}
+
+/// The Tiles contained in the [Map].
+#[derive(PartialEq)]
+#[derive(Copy, Clone)]
 enum Tile {
     EMPTY,
     SNAKE,
-    FOOD
+    FOOD,
 }
 
+/// The Symbol representing a border tile.
+const BORDER_SYMBOL: &str = "#";
+
+/// The tiles contained in the [Map] representing game elements.
+impl Tile {
+    fn symbol(&self) -> &str {
+        match self {
+            Tile::EMPTY => " ",
+            Tile::FOOD => "◯",
+            Tile::SNAKE => "□"
+        }
+    }
+}
+
+/// Structure representing the snake.
 struct Snake {
     head: (isize, isize),
     dir: Direction,
     size: usize,
-    tail: Vec<(usize, usize)>
+    tail: Vec<(usize, usize)>,
 }
 
 impl Snake {
+    /// Creates a new snake in the middle of the [Map] with a length of 3 and facing [NONE].
     fn new() -> Snake {
         Snake {
-            head: ((SCREEN_WIDTH / 2) as isize, (SCREEN_HEIGHT / 2) as isize),
-            dir: RIGHT,
+            head: ((MAP_WIDTH / 2) as isize, (MAP_HEIGHT / 2) as isize),
+            dir: Direction::NONE,
             size: 3,
-            tail: Vec::new()
+            tail: Vec::new(),
         }
     }
 
+    /// Sets the `Snake`'s direction to the given one if it doesn't [oppose](Direction::opposite()) the current one.
     fn turn(&mut self, dir: Direction) -> () {
         if !self.dir.opposite(&dir) {
             self.dir = dir;
         }
     }
 
+    /// Moves the `Snake` one space forward.
+    ///
+    /// The current position will be appended to the tail.
+    /// If the tail's length reached the size of this `Snake`,
+    /// the last tail piece is removed from the [Map]
     fn forward(&mut self, map: &mut Map) -> () {
+        // Add head to the tail and put snake tile on the map.
         self.tail.push((self.x(), self.y()));
         map[self.x()][self.y()] = Tile::SNAKE;
 
-        self.head.0 += self.dir.x;
-        self.head.1 += self.dir.y;
+        // Move in the current direction.
+        self.head.0 += self.dir.x();
+        self.head.1 += self.dir.y();
 
+        // Remove the last tail piece, if size is reached.
         if self.tail.len() > self.size {
             let rem = self.tail.remove(0);
             map[rem.0][rem.1] = Tile::EMPTY;
         }
     }
 
+    /// Returns if this `Snake` is out of the [Map] boundaries.
+    ///
+    /// The boundaries range from `0` to [SCREEN_WIDTH] / [SCREEN_HEIGHT].
     fn out_of_bounds(&self) -> bool {
-        self.head.0 < 0 || self.head.0 >= SCREEN_WIDTH as isize || self.head.1 < 0 || self.head.1 >= SCREEN_HEIGHT as isize
+        self.head.0 < 0
+            || self.head.0 >= MAP_WIDTH as isize
+            || self.head.1 < 0
+            || self.head.1 >= MAP_HEIGHT as isize
     }
 
-    fn touch_tail(&self) -> bool {
-        self.tail.iter().any(|tail| { tail.0 == self.x() && tail.1 == self.y() })
-    }
-
+    /// The x coordinate of the `Snake`'s head.
     fn x(&self) -> usize { self.head.0 as usize }
 
+    /// The y coordinate of the `Snake`'s head.
     fn y(&self) -> usize { self.head.1 as usize }
 }
 
-impl Direction {
-    fn opposite(&self, dir: &Direction) -> bool {
-        self.x + dir.x == 0 && self.y + dir.y == 0
-    }
-}
+/// The time delay between every [Snake] move.
+const DELAY: usize = 100;
 
-const DELAY: usize = 250;
-
-const LEFT: Direction = Direction { x: -1, y: 0 };
-const RIGHT: Direction = Direction { x: 1, y: 0 };
-const UP: Direction = Direction { x: 0, y: -1 };
-const DOWN: Direction = Direction { x: 0, y: 1 };
-
-const SCREEN_WIDTH: usize = 10;
-const SCREEN_HEIGHT: usize = 10;
-
-const EMPTY_SYMBOL: &str = " ";
-const BORDER_SYMBOL: &str = "#";
-const SNAKE_SYMBOL: &str = "□";
-const FOOD_SYMBOL: &str = "◯";
-
+/// The main Function.
+///
+/// Starts a new game of snake and terminates when the game ends.
 fn main() {
-    let gui = false;
-
-    if gui {
-
-    } else {
-        console_snake();
-    }
-}
-
-fn console_snake() -> () {
+    // Used to handle input and output.
     let term = Arc::new(console::Term::stdout());
-    term.hide_cursor().unwrap();
+    term.hide_cursor().ok();  //Ignore potentially occurring error.
 
-    let dir = Arc::new(Mutex::new(LEFT));
+    // A flag to determine if the game should keep running.
     let running = Arc::new(Mutex::new(true));
 
-    let dir_clone = Arc::clone(&dir);
-    let term_clone = Arc::clone(&term);
-    let running_clone = Arc::clone(&running);
+    // The last inputted direction.
+    let dir = Arc::new(Mutex::new(Direction::NONE));
 
-    let handle = thread::spawn(move || {
-        loop {
-            let key = term_clone.read_key().unwrap();
+    // Start a thread capturing user inputs.
+    let input_handle = capture_inputs(Arc::clone(&term),
+                                      Arc::clone(&dir),
+                                      Arc::clone(&running));
 
-            let mut dir = dir_clone.lock().unwrap();
-
-            match key {
-                Key::ArrowLeft => *dir = LEFT,
-                Key::ArrowRight => *dir = RIGHT,
-                Key::ArrowUp => *dir = UP,
-                Key::ArrowDown => *dir = DOWN,
-                Key::Backspace => {
-                    *running_clone.lock().unwrap() = false;
-                },
-                _ => (),
-            };
-
-            if !*running_clone.lock().unwrap() {
-                break;
-            }
-        }
-    });
-
-    let mut map: Map = [[Tile::EMPTY; SCREEN_HEIGHT]; SCREEN_WIDTH];
-
+    // Initialize the map and snake.
+    let mut map: Map = [[Tile::EMPTY; MAP_HEIGHT]; MAP_WIDTH];
     let mut snake = Snake::new();
 
+    // Create a food and draw the map.
     make_food(&mut map);
-    draw(&term, &mut map).unwrap();
+    map[snake.x()][snake.y()] = Tile::SNAKE;
+    draw(&term, &mut map).unwrap(); // Panic if unable to print map.
 
-    loop {
-        snake.turn(*dir.lock().unwrap());
-        snake.forward(&mut map);
-
-        term.clear_last_lines(SCREEN_HEIGHT + 2).unwrap();
-        if snake.out_of_bounds() || snake.touch_tail() {
-            term.write_line("Game Over!").unwrap();
-
-            *running.lock().unwrap() = false;
+    // The game loop.
+    while running.lock().map_or(false, |x| *x) {
+        if let Ok(dir) = dir.lock() {
+            // Turn the snake to the last inputted direction and move it forward.
+            snake.turn(*dir);
         } else {
-            if map[snake.x()][snake.y()] == Tile::FOOD {
-                snake.size += 1;
-
-                make_food(&mut map);
-            }
-
-            map[snake.x()][snake.y()] = Tile::SNAKE;
-
-            draw(&term, &mut map).unwrap();
-        }
-
-        if !*running.lock().unwrap() {
+            // End the loop if the capturing thread panicked.
             break;
-        } else {
-            spin_sleep::sleep(Duration::from_millis(DELAY as u64));
         }
+
+        // Check if the user has inputted a valid direction
+        if snake.dir != Direction::NONE {
+            snake.forward(&mut map);
+
+            // Clear the drawn map.
+            term.clear_last_lines(MAP_HEIGHT + 2).unwrap(); // Panic if unable to clear the map
+
+            // Check if the snake went out of bounds or ran into itself.
+            if snake.out_of_bounds() || map[snake.x()][snake.y()] == Tile::SNAKE {
+                term.write_line("Game Over!").unwrap();
+
+                // Let the loop and the input capturing thread terminate.
+                if let Ok(mut running) = running.lock() {
+                    *running = false;
+                } else {
+                    break;
+                }
+            } else {
+                // Check if the snake touched food.
+                if map[snake.x()][snake.y()] == Tile::FOOD {
+                    snake.size += 1;
+
+                    // Generate a new food tile
+                    make_food(&mut map);
+                }
+
+                // Set the current snake head position to a snake tile.
+                map[snake.x()][snake.y()] = Tile::SNAKE;
+
+                // Draw the map.
+                draw(&term, &mut map).unwrap();
+            }
+        }
+
+        // Sleep before attempting to move the snake again.
+        spin_sleep::sleep(Duration::from_millis(DELAY as u64));
     }
 
-    handle.join().unwrap();
+    // Wait for the input capturing thread to terminate.
+    input_handle.join().expect("Capturing user inputs failed.");
 
+    // Restore the cursor location and visibility
     term.move_cursor_left(10).unwrap();
     term.show_cursor().unwrap();
 }
 
+/// Create a thread continuously capturing user inputs from the terminal.
+///
+/// It will repeatedly lock and update the [Direction] according to user inputs.
+/// The thread will stop looping if `running` becomes `false`.
+///
+/// Note the arguments are wrapped in [Arc] and [Mutex], to allow shared ownership
+/// and parallel access between game loop and the created thread.
+fn capture_inputs(term: Arc<console::Term>, dir: Arc<Mutex<Direction>>, running: Arc<Mutex<bool>>) -> JoinHandle<()> {
+    thread::spawn(move || {
+        loop {
+            // Capture the next input key.
+            let key = term.read_key().unwrap();
+
+            // lock the direction until the next loop iteration.
+            let mut dir = dir.lock().unwrap();
+
+            // Update the direction according to user input.
+            match key {
+                Key::ArrowLeft => *dir = Direction::LEFT,
+                Key::ArrowRight => *dir = Direction::RIGHT,
+                Key::ArrowUp => *dir = Direction::UP,
+                Key::ArrowDown => *dir = Direction::DOWN,
+                Key::Backspace => {
+                    // Set the flag to stop the game.
+                    *running.lock().unwrap() = false;
+                }
+                _ => (),
+            };
+
+            // Stop capturing inputs if the game stopped running.
+            if !*running.lock().unwrap() {
+                break;
+            }
+        }
+    })
+}
+
+/// Create a food tile at a random location, which is not occupied by the snake.
 fn make_food(map: &mut Map) -> () {
     let mut rng = rand::thread_rng();
 
+    // Loop through random locations until an applicable one is found.
     loop {
-        let fx = rng.gen_range(0..SCREEN_WIDTH);
-        let fy = rng.gen_range(0..SCREEN_HEIGHT);
+        let fx = rng.gen_range(0..MAP_WIDTH);
+        let fy = rng.gen_range(0..MAP_HEIGHT);
 
         if map[fx][fy] == Tile::EMPTY {
             map[fx][fy] = Tile::FOOD;
@@ -190,31 +296,42 @@ fn make_food(map: &mut Map) -> () {
     }
 }
 
+/// Prints out the map in the terminal.
+///
+/// The Map will be encased by a border, made up of [BORDER_SYMBOL].
+///
+/// Returns an [io::Result::Err] if a terminal operation fails.
 fn draw(term: &console::Term, map: &Map) -> io::Result<()> {
-    let border = &str::repeat(BORDER_SYMBOL, SCREEN_WIDTH * 2 as usize + 3);
+    // A full row filled with the border symbol.
+    let border = &str::repeat(BORDER_SYMBOL, GAME_WIDTH);
 
+    // Print the top border row
     term.write_line(border)?;
-    term.move_cursor_left(SCREEN_WIDTH as usize * 2 + 3)?;
-    for y in 0..SCREEN_HEIGHT {
+    term.move_cursor_left(GAME_WIDTH)?;
+
+    // Iterate over the map rows and print them.
+    for y in 0..MAP_HEIGHT {
         let mut line = String::new();
 
         line.push_str(BORDER_SYMBOL);
-        for x in 0..SCREEN_WIDTH {
+        line.push_str(map[0][y].symbol());
+
+        // Append each symbol with spaces in between.
+        for x in 1..MAP_WIDTH {
             line.push_str(" ");
-            line.push_str(match map[x][y] {
-                Tile::SNAKE => SNAKE_SYMBOL,
-                Tile::FOOD => FOOD_SYMBOL,
-                Tile::EMPTY => EMPTY_SYMBOL
-            });
+            line.push_str(map[x][y].symbol());
         }
         line.push_str(" ");
         line.push_str(BORDER_SYMBOL);
 
+        // Print the line and reset the cursor position.
         term.write_line(&line)?;
-        term.move_cursor_left(SCREEN_WIDTH as usize * 2 + 3)?;
+        term.move_cursor_left(GAME_WIDTH)?;
     }
+
+    // Print the bottom border row.
     term.write_line(border)?;
-    term.move_cursor_left(SCREEN_WIDTH as usize * 2 + 3)?;
+    term.move_cursor_left(GAME_WIDTH)?;
 
     Ok(())
 }
