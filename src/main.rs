@@ -25,9 +25,10 @@ const MAP_HEIGHT: usize = 15;
 /// Type used to store the position of snake and food tiles.
 type Map = [[Tile; MAP_HEIGHT]; MAP_WIDTH];
 
+/// The width of the displayed game in characters.
 const GAME_WIDTH: usize = MAP_WIDTH * 2 + 2;
 
-/// The four directions the [Snake] can face.
+/// The four directions the [Snake] can face and `NONE` in case of a new snake.
 #[derive(Copy, Clone)]
 #[derive(PartialEq)]
 enum Direction {
@@ -100,7 +101,7 @@ struct Snake {
 }
 
 impl Snake {
-    /// Creates a new snake in the middle of the [Map] with a length of 3 and facing [NONE].
+    /// Creates a new snake in the middle of the [Map] with a length of 3 and facing [NONE](Direction).
     fn new() -> Snake {
         Snake {
             head: ((MAP_WIDTH / 2) as isize, (MAP_HEIGHT / 2) as isize),
@@ -140,7 +141,7 @@ impl Snake {
 
     /// Returns if this `Snake` is out of the [Map] boundaries.
     ///
-    /// The boundaries range from `0` to [SCREEN_WIDTH] / [SCREEN_HEIGHT].
+    /// The boundaries range from `0` to [MAP_WIDTH] / [MAP_HEIGHT].
     fn out_of_bounds(&self) -> bool {
         self.head.0 < 0
             || self.head.0 >= MAP_WIDTH as isize
@@ -300,7 +301,7 @@ fn make_food(map: &mut Map) -> () {
 ///
 /// The Map will be encased by a border, made up of [BORDER_SYMBOL].
 ///
-/// Returns an [io::Result::Err] if a terminal operation fails.
+/// Returns an [Err] if a terminal operation fails.
 fn draw(term: &console::Term, map: &Map) -> io::Result<()> {
     // A full row filled with the border symbol.
     let border = &str::repeat(BORDER_SYMBOL, GAME_WIDTH);
