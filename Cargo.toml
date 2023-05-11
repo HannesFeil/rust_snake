@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-console = "0.15.0"
+crossterm = "0.25.0"
 rand = "0.8.5"
 spin_sleep = "1.1.1"

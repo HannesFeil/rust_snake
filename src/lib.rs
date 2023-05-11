@@ -38,14 +38,14 @@ const INITIAL_SNAKE_SIZE: usize = 3;
 pub enum State {
     Running,
     Paused,
-    GameOver
+    GameOver,
 }
 
 /// Struct representing the state of the game and offering methods to alter it.
 pub struct Game<const W: usize, const H: usize> {
     map: map::Map<W, H>,
     snake: snake::Snake,
-    pub state: State
+    pub state: State,
 }
 
 impl<const W: usize, const H: usize> Game<W, H> {
@@ -58,7 +58,7 @@ impl<const W: usize, const H: usize> Game<W, H> {
         let mut game = Game {
             map: map::Map::<W, H>::new(),
             snake: snake::Snake::new(W / 2, H / 2, INITIAL_SNAKE_SIZE),
-            state: State::Paused
+            state: State::Paused,
         };
 
         game.snake.place_head(&mut game.map);
@@ -90,13 +90,13 @@ impl<const W: usize, const H: usize> Game<W, H> {
                 map::Tile::Snake => {
                     // The snake ran into itself, game over.
                     self.game_over();
-                },
+                }
                 map::Tile::Food => {
                     // Increase the snake size and create a new food tile.
                     self.snake.size += 1;
                     self.create_food();
-                },
-                map::Tile::Empty => ()
+                }
+                map::Tile::Empty => (),
             }
 
             // Update the snake head on the map
@@ -150,7 +150,10 @@ impl<const W: usize, const H: usize> Game<W, H> {
     ///         }
     ///     }
     /// })
-    pub fn display<F, R>(&self, func: F) -> R where F: FnOnce(&map::Map<W, H>) -> R {
+    pub fn display<F, R>(&self, func: F) -> R
+    where
+        F: FnOnce(&map::Map<W, H>) -> R,
+    {
         func(&self.map)
     }
 

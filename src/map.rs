@@ -1,13 +1,13 @@
 /// Struct representing the map, containing snake and food locations.
 pub struct Map<const W: usize, const H: usize> {
-    data: [[Tile; H]; W]
+    data: [[Tile; H]; W],
 }
 
-impl <const W: usize, const H: usize> Map<W, H> {
+impl<const W: usize, const H: usize> Map<W, H> {
     /// Creates a map filled with [Tile::Empty].
     pub fn new() -> Self {
         Map {
-            data: [[Tile::Empty; H]; W]
+            data: [[Tile::Empty; H]; W],
         }
     }
 
@@ -31,15 +31,14 @@ impl <const W: usize, const H: usize> Map<W, H> {
     }
 }
 
-impl <const W: usize, const H: usize> Default for Map<W, H> {
+impl<const W: usize, const H: usize> Default for Map<W, H> {
     fn default() -> Self {
         Map::new()
     }
 }
 
 /// The Tiles contained in the [Map].
-#[derive(PartialEq)]
-#[derive(Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum Tile {
     Empty,
     Snake,
